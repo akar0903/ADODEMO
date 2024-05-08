@@ -1,5 +1,4 @@
 C:\Users\admin\source\repos\ADOCRUD\bin\Debug\net8.0\appsettings.Development.json
-C:\Users\admin\source\repos\ADOCRUD\bin\Debug\net8.0\appsettings.json
 C:\Users\admin\source\repos\ADOCRUD\bin\Debug\net8.0\ADOCRUD.exe
 C:\Users\admin\source\repos\ADOCRUD\bin\Debug\net8.0\ADOCRUD.deps.json
 C:\Users\admin\source\repos\ADOCRUD\bin\Debug\net8.0\ADOCRUD.runtimeconfig.json
@@ -65,3 +64,14 @@ C:\Users\admin\source\repos\ADOCRUD\obj\Debug\net8.0\refint\ADOCRUD.dll
 C:\Users\admin\source\repos\ADOCRUD\obj\Debug\net8.0\ADOCRUD.pdb
 C:\Users\admin\source\repos\ADOCRUD\obj\Debug\net8.0\ADOCRUD.genruntimeconfig.cache
 C:\Users\admin\source\repos\ADOCRUD\obj\Debug\net8.0\ref\ADOCRUD.dll
+C:\Users\admin\source\repos\ADOCRUD\bin\Debug\net8.0\Microsoft.Extensions.Caching.Redis.dll
+C:\Users\admin\source\repos\ADOCRUD\bin\Debug\net8.0\Microsoft.Extensions.Caching.StackExchangeRedis.dll
+C:\Users\admin\source\repos\ADOCRUD\bin\Debug\net8.0\Microsoft.Extensions.DependencyInjection.Abstractions.dll
+C:\Users\admin\source\repos\ADOCRUD\bin\Debug\net8.0\Microsoft.Extensions.Logging.Abstractions.dll
+C:\Users\admin\source\repos\ADOCRUD\bin\Debug\net8.0\Microsoft.Extensions.Options.dll
+C:\Users\admin\source\repos\ADOCRUD\bin\Debug\net8.0\Pipelines.Sockets.Unofficial.dll
+C:\Users\admin\source\repos\ADOCRUD\bin\Debug\net8.0\StackExchange.Redis.dll
+C:\Users\admin\source\repos\ADOCRUD\bin\Debug\net8.0\StackExchange.Redis.StrongName.dll
+C:\Users\admin\source\repos\ADOCRUD\obj\Debug\net8.0\ADOCRUD.sourcelink.json
+C:\Users\admin\source\repos\ADOCRUD\bin\Debug\net8.0\Newtonsoft.Json.dll
+C:\Users\admin\source\repos\ADOCRUD\bin\Debug\net8.0\appsettings.json

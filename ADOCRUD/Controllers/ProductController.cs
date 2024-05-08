@@ -2,6 +2,9 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Caching.Distributed;
+using Newtonsoft.Json;
+using StackExchange.Redis;
 using System.Data;
 using System.Security.Cryptography.Xml;
 
@@ -12,28 +15,63 @@ namespace ADOCRUD.Controllers
     public class ProductController : ControllerBase
     {
         private readonly IConfiguration configuration;
-        public ProductController(IConfiguration configuration)
+        private readonly IDistributedCache cache;
+        //private string keyname = "ProductData";
+       
+        public ProductController(IConfiguration configuration, IDistributedCache cache)
         {
             this.configuration = configuration;
+            this.cache = cache;
         }
         [HttpGet]
         [Route("GetAll")]
         public async Task<List<ProductModel>> GetAllProduct()
         {
+            try
+            {
+                string cacheKey = "ID";
+                string cachedData = await cache.GetStringAsync(cacheKey);
+                List<ProductModel> ProductModels;
+                if (!string.IsNullOrEmpty(cachedData))
+                {
+                    ProductModels = JsonConvert.DeserializeObject<List<ProductModel>>(cachedData);
+                }
+                else
+                {
+                    ProductModels = await GetProductDataFromSource(); 
+                    string serializedData = JsonConvert.SerializeObject(ProductModels);
+                    await cache.SetStringAsync(cacheKey, serializedData, new DistributedCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(35) 
+                    });
+                }
+                return ProductModels;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                throw; 
+            }
+        }
+        private async Task<List<ProductModel>> GetProductDataFromSource()
+        {
             List<ProductModel> ProductModels = new List<ProductModel>();
             DataTable dataTable = new DataTable();
-            SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection"));
-            SqlCommand cmd = new SqlCommand("select * from Product",con);
-            SqlDataAdapter adapter = new SqlDataAdapter(cmd);
-            adapter.Fill(dataTable);
-            for(int i = 0; i < dataTable.Rows.Count; i++)
+            using (SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection")))
             {
-                ProductModel productModel = new ProductModel();
-                productModel.ProductId = Convert.ToInt32(dataTable.Rows[i]["ID"]);
-                productModel.ProductName = dataTable.Rows[i]["ProductName"].ToString();
-                productModel.ProductPrice = Convert.ToDecimal(dataTable.Rows[i]["ProductPrice"]);
-                productModel.EntryDate = Convert.ToDateTime(dataTable.Rows[i]["ProductEntryDate"]);
-                ProductModels.Add(productModel);
+                SqlCommand cmd = new SqlCommand("SELECT * FROM Product", con);
+                SqlDataAdapter adapter = new SqlDataAdapter(cmd);
+                await con.OpenAsync();
+                adapter.Fill(dataTable);
+                for (int i = 0; i < dataTable.Rows.Count; i++)
+                {
+                    ProductModel productModel = new ProductModel();
+                    productModel.ProductId = Convert.ToInt32(dataTable.Rows[i]["ID"]);
+                    productModel.ProductName = dataTable.Rows[i]["ProductName"].ToString();
+                    productModel.ProductPrice = Convert.ToDecimal(dataTable.Rows[i]["ProductPrice"]);
+                    productModel.EntryDate = Convert.ToDateTime(dataTable.Rows[i]["ProductEntryDate"]);
+                    ProductModels.Add(productModel);
+                }
             }
             return ProductModels;
         }
@@ -43,79 +81,24 @@ namespace ADOCRUD.Controllers
         {
             try
             {
-                SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection"));
-                SqlCommand cmd = new SqlCommand("Insert into Product values('"+ obj.ProductId +"','" + obj.ProductName + "','" + obj.ProductPrice + "',getDate())", con);
-                con.Open();
-                cmd.ExecuteNonQuery();
-                con.Close();
+                using (SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection")))
+                {
+                    SqlCommand cmd = new SqlCommand("Insert into Product values(@ProductId, @ProductName, @ProductPrice, getDate())", con);
+                    cmd.Parameters.AddWithValue("@ProductId", obj.ProductId);
+                    cmd.Parameters.AddWithValue("@ProductName", obj.ProductName);
+                    cmd.Parameters.AddWithValue("@ProductPrice", obj.ProductPrice);
+                    await con.OpenAsync();
+                    await cmd.ExecuteNonQueryAsync();
+                }
+                string cacheKey = "ID";
+                await cache.RemoveAsync(cacheKey); 
                 return Ok(obj);
             }
             catch (Exception ex)
             {
-                throw ex;
+                return StatusCode(500, $"An error occurred: {ex.Message}");
             }
-            
-        }
-        [HttpPost]
-        [Route("UpdateProduct")]
-        public async Task<IActionResult> UpdateProduct(ProductModel obj)
-        {
-            try
-            {
-                SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection"));
-                SqlCommand cmd = new SqlCommand("UPDATE Product SET ProductName='" + obj.ProductName + "', ProductPrice='" + obj.ProductPrice + "', ProductEntryDate = GETDATE() WHERE ID='" + obj.ProductId + "'", con);
-                con.Open();
-                cmd.ExecuteNonQuery();
-                con.Close();
-                return Ok(obj);
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-        }
-        //[HttpPost]
-        //[Route("Product")]
-        //public async Task<IActionResult> Product(ProductModel obj)
-        //{
-        //    SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection"));
-        //    SqlCommand cmd;
-        //    SqlDataAdapter da;
-        //    DataTable dataTable = new DataTable();
-        //    try
-        //    {
-        //        cmd = new SqlCommand("Product",con);
-        //        cmd.CommandType = CommandType.StoredProcedure;
-        //        cmd.Parameters.AddWithValue("@action", obj.ActionId);
-        //        cmd.Parameters.AddWithValue("@ID", obj.ProductId);
-        //        cmd.Parameters.AddWithValue("@ProductName", obj.ProductName);
-        //        cmd.Parameters.AddWithValue("@ProductPrice", obj.ProductPrice);
-        //        da= new SqlDataAdapter();
-        //        da.Fill(dataTable);
-        //        if (obj.ActionId == 4)
-        //        {
-        //            List<ProductModel> ProductModels = new List<ProductModel>();
-        //            for (int i = 0; i < dataTable.Rows.Count; i++)
-        //            {
-        //                ProductModel productModel = new ProductModel();
-        //                productModel.ProductId = Convert.ToInt32(dataTable.Rows[i]["ID"]);
-        //                productModel.ProductName = dataTable.Rows[i]["ProductName"].ToString();
-        //                productModel.ProductPrice = Convert.ToDecimal(dataTable.Rows[i]["ProductPrice"]);
-        //                productModel.EntryDate = Convert.ToDateTime(dataTable.Rows[i]["ProductEntryDate"]);
-        //                ProductModels.Add(productModel);
-        //            }
-        //            return Ok(ProductModels);
-        //        }
-        //        else
-        //        {
-        //            return Ok(obj); 
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        throw ex;
-        //    }
-        //}
+        }   
         [HttpDelete]
         [Route("DeleteProduct")]
         public async Task<IActionResult> DeleteProduct(int id)
@@ -131,7 +114,10 @@ namespace ADOCRUD.Controllers
                     {
                         
                         cmd.Parameters.AddWithValue("@ProductId", id);
-                        int rowsAffected = cmd.ExecuteNonQuery();
+                        int rowsAffected = await cmd.ExecuteNonQueryAsync();
+
+                        string cacheKey = "ID";
+                        await cache.RemoveAsync(cacheKey);
                         if (rowsAffected > 0)
                         {
                             
@@ -170,7 +156,6 @@ namespace ADOCRUD.Controllers
                         ProductPrice = Convert.ToDecimal(reader["ProductPrice"]),
                         EntryDate = Convert.ToDateTime(reader["ProductEntryDate"])
                     };
-
                     con.Close();
                     return Ok(product);
                 }
@@ -284,6 +269,5 @@ namespace ADOCRUD.Controllers
                 throw ex;
             }
         }
-        
     }
 }
