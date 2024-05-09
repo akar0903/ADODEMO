@@ -95,28 +95,53 @@ namespace ADOCRUD.Services
         }
         public async Task<ProductModel> GetProductById(int id)
         {
-            using (SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection")))
+            string cacheKey = $"ID:{id}";
+            string cachedData = await cache.GetStringAsync(cacheKey);
+
+            if (!string.IsNullOrEmpty(cachedData))
             {
-                SqlCommand cmd = new SqlCommand("SELECT * FROM Product WHERE ID = @Id", con);
-                cmd.Parameters.AddWithValue("@Id", id);
-                await con.OpenAsync();
-                SqlDataReader reader = await cmd.ExecuteReaderAsync();
-                if (reader.Read())
-                {
-                    ProductModel product = new ProductModel
-                    {
-                        ProductId = Convert.ToInt32(reader["ID"]),
-                        ProductName = reader["ProductName"].ToString(),
-                        ProductPrice = Convert.ToDecimal(reader["ProductPrice"]),
-                        EntryDate = Convert.ToDateTime(reader["ProductEntryDate"])
-                    };
-                    return product;
-                }
-                return null;
+                return JsonConvert.DeserializeObject<ProductModel>(cachedData);
             }
+            else
+            {
+                using (SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection")))
+                {
+                    SqlCommand cmd = new SqlCommand("SELECT * FROM Product WHERE ID = @Id", con);
+                    cmd.Parameters.AddWithValue("@Id", id);
+                    await con.OpenAsync();
+                    SqlDataReader reader = await cmd.ExecuteReaderAsync();
+                    if (reader.Read())
+                    {
+                        ProductModel product = new ProductModel
+                        {
+                            ProductId = Convert.ToInt32(reader["ID"]),
+                            ProductName = reader["ProductName"].ToString(),
+                            ProductPrice = Convert.ToDecimal(reader["ProductPrice"]),
+                            EntryDate = Convert.ToDateTime(reader["ProductEntryDate"])
+                        };
+
+                        // Store the retrieved data in the cache
+                        await cache.SetStringAsync(cacheKey, JsonConvert.SerializeObject(product), new DistributedCacheEntryOptions
+                        {
+                            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30) // Cache for 30 minutes
+                        });
+
+                        return product;
+                    }
+                }
+            }
+
+            return null;
         }
         public async Task<ProductModel> GetProductByName(string name)
         {
+            string cacheKey = $"ID:{name}";
+            string cachedData = await cache.GetStringAsync(cacheKey);
+
+            if (!string.IsNullOrEmpty(cachedData))
+            {
+                return JsonConvert.DeserializeObject<ProductModel>(cachedData);
+            }
             using (SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection")))
             {
                 SqlCommand cmd = new SqlCommand("SELECT * FROM Product WHERE ProductName = @Name", con);
@@ -132,55 +157,98 @@ namespace ADOCRUD.Services
                         ProductPrice = Convert.ToDecimal(reader["ProductPrice"]),
                         EntryDate = Convert.ToDateTime(reader["ProductEntryDate"])
                     };
+                    await cache.SetStringAsync(cacheKey, JsonConvert.SerializeObject(product), new DistributedCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30) // Cache for 30 minutes
+                    });
                     return product;
                 }
                 return null;
             }
         }
-        public async Task<ProductModel> GetProductByNamePrice(string name,float price)
+        public async Task<ProductModel> GetProductByNamePrice(string name, float price)
         {
-            using (SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection")))
+            string cacheKey = $"ID:{name}:{price}";
+
+            // Check if data exists in cache
+            string cachedData = await cache.GetStringAsync(cacheKey);
+            if (!string.IsNullOrEmpty(cachedData))
             {
-                SqlCommand cmd = new SqlCommand("SELECT * FROM Product WHERE ProductName = @Name AND ProductPrice = @Price", con);
-                cmd.Parameters.AddWithValue("@Name", name);
-                cmd.Parameters.AddWithValue("@Price", price);
-                await con.OpenAsync();
-                SqlDataReader reader = await cmd.ExecuteReaderAsync();
-                if (reader.Read())
-                {
-                    ProductModel product = new ProductModel
-                    {
-                        ProductId = Convert.ToInt32(reader["ID"]),
-                        ProductName = reader["ProductName"].ToString(),
-                        ProductPrice = Convert.ToDecimal(reader["ProductPrice"]),
-                        EntryDate = Convert.ToDateTime(reader["ProductEntryDate"])
-                    };
-                    return product;
-                }
-                return null;
+                // If data is found in cache, return it
+                return JsonConvert.DeserializeObject<ProductModel>(cachedData);
             }
+            else
+            {
+                // If data is not found in cache, query the database
+                using (SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection")))
+                {
+                    SqlCommand cmd = new SqlCommand("SELECT * FROM Product WHERE ProductName = @Name AND ProductPrice = @Price", con);
+                    cmd.Parameters.AddWithValue("@Name", name);
+                    cmd.Parameters.AddWithValue("@Price", price);
+                    await con.OpenAsync();
+                    SqlDataReader reader = await cmd.ExecuteReaderAsync();
+                    if (reader.Read())
+                    {
+                        // Create product model from database result
+                        ProductModel product = new ProductModel
+                        {
+                            ProductId = Convert.ToInt32(reader["ID"]),
+                            ProductName = reader["ProductName"].ToString(),
+                            ProductPrice = Convert.ToDecimal(reader["ProductPrice"]),
+                            EntryDate = Convert.ToDateTime(reader["ProductEntryDate"])
+                        };
+
+                        // Store the retrieved data in the cache
+                        await cache.SetStringAsync(cacheKey, JsonConvert.SerializeObject(product), new DistributedCacheEntryOptions
+                        {
+                            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30) // Cache for 30 minutes
+                        });
+
+                        return product;
+                    }
+                }
+            }
+
+            return null;
         }
         public async Task<int> GetTotalID()
         {
-            using (SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection")))
+            string cacheKey = "TotalID";
+            string cachedData = await cache.GetStringAsync(cacheKey);
+
+            if (!string.IsNullOrEmpty(cachedData))
             {
-                SqlCommand cmd = new SqlCommand("SELECT COUNT(ID) as CountID From Product", con);
-                await con.OpenAsync();
-                SqlDataReader reader = await cmd.ExecuteReaderAsync();
-                if (reader.Read())
+                // If total ID count exists in cache, return it directly
+                return int.Parse(cachedData);
+            }
+            else
+            {
+                // If total ID count is not found in cache, fetch it from the database
+                using (SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection")))
                 {
-                    int totalCount = Convert.ToInt32(reader["CountID"]);
-                    con.Close();
-                    return totalCount;
+                    SqlCommand cmd = new SqlCommand("SELECT COUNT(ID) as CountID FROM Product", con);
+                    await con.OpenAsync();
+                    SqlDataReader reader = await cmd.ExecuteReaderAsync();
+                    if (reader.Read())
+                    {
+                        int totalCount = Convert.ToInt32(reader["CountID"]);
+
+                        // Store the total ID count in the cache
+                        await cache.SetStringAsync(cacheKey, totalCount.ToString(), new DistributedCacheEntryOptions
+                        {
+                            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30) // Cache for 30 minutes
+                        });
+
+                        return totalCount;
+                    }
+                    else
+                    {
+                        return 0; // Return 0 if no records found in the database
+                    }
                 }
-                else
-                {
-                    con.Close();
-                    return 0;
-                }
-                
             }
         }
+
 
 
     }

@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ADOCRUD")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a61b7ad929dcc4dfd2e22cac1f18462399323c5e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8dfd060241bbcfefb05256918bdd2fc4a54f8fe8")]
 [assembly: System.Reflection.AssemblyProductAttribute("ADOCRUD")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ADOCRUD")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
