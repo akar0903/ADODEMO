@@ -57,6 +57,20 @@ namespace ADOCRUD.Controllers
                 return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }
+        [HttpPost]
+        [Route("UpdateProduct")]
+        public async Task<IActionResult> UpdateProduct(ProductModel product)
+        {
+            try
+            {
+                await productRepository.UpdateProduct(product);
+                return Ok(product);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
         [HttpDelete]
         [Route("DeleteProduct")]
         public async Task<IActionResult> DeleteProduct(int id)
@@ -134,6 +148,21 @@ namespace ADOCRUD.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
+        [HttpGet]
+        [Route("GetAllcolor")]
+        public async Task<IActionResult> GetColorProducts(string color)
+        {
+            try
+            {
+                var products = await productRepository.GetColorProducts(color);
+                return Ok(products);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return StatusCode(500, "An error occurred while fetching products.");
             }
         }
     }

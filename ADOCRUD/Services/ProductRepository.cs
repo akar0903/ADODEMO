@@ -18,6 +18,49 @@ namespace ADOCRUD.Services
             this.cache = cache;
         }
 
+        //public async Task GetAllProducts()
+        //{
+        //    string cacheKey = "ID";
+        //    string cachedData = await cache.GetStringAsync(cacheKey);
+        //    List<ProductModel> products;
+        //    if (!string.IsNullOrEmpty(cachedData))
+        //    {
+        //        products = JsonConvert.DeserializeObject<List<ProductModel>>(cachedData);
+        //    }
+        //    else
+        //    {
+        //        products =  GetProductDataFromSource();
+        //        string serializedData = JsonConvert.SerializeObject(products);
+        //        await cache.SetStringAsync(cacheKey, serializedData, new DistributedCacheEntryOptions
+        //        {
+        //            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(35)
+        //        });
+        //    }
+        //}
+
+        //private async List<ProductModel> GetProductDataFromSource()
+        //{
+        //    List<ProductModel> products = new List<ProductModel>();
+        //    DataTable dataTable = new DataTable();
+        //    using (SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection")))
+        //    {
+        //        SqlCommand cmd = new SqlCommand("SELECT * FROM Product", con);
+        //        SqlDataAdapter adapter = new SqlDataAdapter(cmd);
+        //        await con.OpenAsync();
+        //        adapter.Fill(dataTable);
+        //        for (int i = 0; i < dataTable.Rows.Count; i++)
+        //        {
+        //            ProductModel productModel = new ProductModel();
+        //            productModel.ProductId = Convert.ToInt32(dataTable.Rows[i]["ID"]);
+        //            productModel.ProductName = dataTable.Rows[i]["ProductName"].ToString();
+        //            productModel.ProductPrice = Convert.ToDecimal(dataTable.Rows[i]["ProductPrice"]);
+        //            productModel.ProductColor = dataTable.Rows[i]["ProductColor"].ToString();
+        //            productModel.EntryDate = Convert.ToDateTime(dataTable.Rows[i]["ProductEntryDate"]);
+        //            products.Add(productModel);
+        //        }
+        //    }
+        //    return products;
+        //}
         public async Task<List<ProductModel>> GetAllProducts()
         {
             string cacheKey = "ID";
@@ -56,6 +99,7 @@ namespace ADOCRUD.Services
                     productModel.ProductName = dataTable.Rows[i]["ProductName"].ToString();
                     productModel.ProductPrice = Convert.ToDecimal(dataTable.Rows[i]["ProductPrice"]);
                     productModel.EntryDate = Convert.ToDateTime(dataTable.Rows[i]["ProductEntryDate"]);
+                    productModel.ProductColor = dataTable.Rows[i]["ProductColor"].ToString();
                     products.Add(productModel);
                 }
             }
@@ -63,16 +107,33 @@ namespace ADOCRUD.Services
         }
         public async Task AddProduct(ProductModel product)
         {
+            string cacheKey = "ID";
             using (SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection")))
             {
-                SqlCommand cmd = new SqlCommand("Insert into Product values(@ProductId, @ProductName, @ProductPrice, GETDATE())", con);
+                SqlCommand cmd = new SqlCommand("Insert into Product values(@ProductId, @ProductName, @ProductPrice, GETDATE(),@ProductColor)", con);
                 cmd.Parameters.AddWithValue("@ProductId", product.ProductId);
                 cmd.Parameters.AddWithValue("@ProductName", product.ProductName);
                 cmd.Parameters.AddWithValue("@ProductPrice", product.ProductPrice);
+                cmd.Parameters.AddWithValue("@ProductColor", product.ProductColor);
                 await con.OpenAsync();
                 await cmd.ExecuteNonQueryAsync();
             }
+            
+            await cache.RemoveAsync(cacheKey);
+        }
+        public async Task UpdateProduct(ProductModel product)
+        {
             string cacheKey = "ID";
+            using (SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection")))
+            {
+                SqlCommand cmd = new SqlCommand("UPDATE Product SET ProductName = @ProductName, ProductPrice = @ProductPrice, ProductEntryDate = GETDATE(), ProductColor = @ProductColor WHERE ID = @ProductId", con);
+                cmd.Parameters.AddWithValue("@ProductId", product.ProductId);
+                cmd.Parameters.AddWithValue("@ProductName", product.ProductName);
+                cmd.Parameters.AddWithValue("@ProductPrice", product.ProductPrice);
+                cmd.Parameters.AddWithValue("@ProductColor", product.ProductColor);
+                await con.OpenAsync();
+                await cmd.ExecuteNonQueryAsync();
+            }
             await cache.RemoveAsync(cacheKey);
         }
         public async Task<int> DeleteProduct(int id)
@@ -123,7 +184,7 @@ namespace ADOCRUD.Services
                         // Store the retrieved data in the cache
                         await cache.SetStringAsync(cacheKey, JsonConvert.SerializeObject(product), new DistributedCacheEntryOptions
                         {
-                            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30) // Cache for 30 minutes
+                            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30) 
                         });
 
                         return product;
@@ -159,7 +220,7 @@ namespace ADOCRUD.Services
                     };
                     await cache.SetStringAsync(cacheKey, JsonConvert.SerializeObject(product), new DistributedCacheEntryOptions
                     {
-                        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30) // Cache for 30 minutes
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30) 
                     });
                     return product;
                 }
@@ -179,7 +240,6 @@ namespace ADOCRUD.Services
             }
             else
             {
-                // If data is not found in cache, query the database
                 using (SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection")))
                 {
                     SqlCommand cmd = new SqlCommand("SELECT * FROM Product WHERE ProductName = @Name AND ProductPrice = @Price", con);
@@ -189,7 +249,6 @@ namespace ADOCRUD.Services
                     SqlDataReader reader = await cmd.ExecuteReaderAsync();
                     if (reader.Read())
                     {
-                        // Create product model from database result
                         ProductModel product = new ProductModel
                         {
                             ProductId = Convert.ToInt32(reader["ID"]),
@@ -197,13 +256,10 @@ namespace ADOCRUD.Services
                             ProductPrice = Convert.ToDecimal(reader["ProductPrice"]),
                             EntryDate = Convert.ToDateTime(reader["ProductEntryDate"])
                         };
-
-                        // Store the retrieved data in the cache
                         await cache.SetStringAsync(cacheKey, JsonConvert.SerializeObject(product), new DistributedCacheEntryOptions
                         {
-                            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30) // Cache for 30 minutes
+                            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30) 
                         });
-
                         return product;
                     }
                 }
@@ -223,7 +279,6 @@ namespace ADOCRUD.Services
             }
             else
             {
-                // If total ID count is not found in cache, fetch it from the database
                 using (SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection")))
                 {
                     SqlCommand cmd = new SqlCommand("SELECT COUNT(ID) as CountID FROM Product", con);
@@ -232,24 +287,66 @@ namespace ADOCRUD.Services
                     if (reader.Read())
                     {
                         int totalCount = Convert.ToInt32(reader["CountID"]);
-
-                        // Store the total ID count in the cache
                         await cache.SetStringAsync(cacheKey, totalCount.ToString(), new DistributedCacheEntryOptions
                         {
-                            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30) // Cache for 30 minutes
+                            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30) 
                         });
 
                         return totalCount;
                     }
                     else
                     {
-                        return 0; // Return 0 if no records found in the database
+                        return 0; 
                     }
                 }
             }
         }
+        public async Task<List<ProductModel>> GetColorProducts(string color)
+        {
+            string cacheKey = $"ID:{color}";
+            string cachedData = await cache.GetStringAsync(cacheKey);
+            List<ProductModel> products;
 
+            if (!string.IsNullOrEmpty(cachedData))
+            {
+                products = JsonConvert.DeserializeObject<List<ProductModel>>(cachedData);
+            }
+            else
+            {
+                products = await GetColorProductsFromSource(color);
+                string serializedData = JsonConvert.SerializeObject(products);
+                await cache.SetStringAsync(cacheKey, serializedData, new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(35)
+                });
+            }
+            return products;
+        }
 
+        private async Task<List<ProductModel>> GetColorProductsFromSource(string color)
+        {
+            List<ProductModel> products = new List<ProductModel>();
+            DataTable dataTable = new DataTable();
+            using (SqlConnection con = new SqlConnection(configuration.GetConnectionString("DefaultConnection")))
+            {
+                SqlCommand cmd = new SqlCommand("SELECT * FROM Product WHERE ProductColor = @ProductColor", con);
+                cmd.Parameters.AddWithValue("@ProductColor", color);
+                SqlDataAdapter adapter = new SqlDataAdapter(cmd);
+                await con.OpenAsync();
+                adapter.Fill(dataTable);
+                for (int i = 0; i < dataTable.Rows.Count; i++)
+                {
+                    ProductModel productModel = new ProductModel();
+                    productModel.ProductId = Convert.ToInt32(dataTable.Rows[i]["ID"]);
+                    productModel.ProductPrice = Convert.ToDecimal(dataTable.Rows[i]["ProductPrice"]);
+                    productModel.ProductName = dataTable.Rows[i]["ProductName"].ToString()??"";
+                    productModel.EntryDate = Convert.ToDateTime(dataTable.Rows[i]["ProductEntryDate"]);
+                    productModel.ProductColor = dataTable.Rows[i]["ProductColor"].ToString();
+                    products.Add(productModel);
+                }
+            }
+            return products;
+        }
 
     }
 }
